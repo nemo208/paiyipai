@@ -357,7 +357,7 @@
     const scores = ROSTER.map(n => ({ n, sim: 1 - levenshtein(c, n) / Math.max(c.length, n.length) }));
     scores.sort((a, b) => b.sim - a.sim);
     const minLen = Math.min(c.length, scores[0].n.length);
-    const threshold = minLen >= 3 ? 0.62 : 0.999;   // 2 字名要求几乎精确
+    const threshold = minLen >= 3 ? 0.33 : 0.5;   // 3字名容忍最多2个错字，2字名容忍1个错字（配合下面的唯一性判断）
     if (scores[0].sim >= threshold && (scores.length < 2 || scores[1].sim < scores[0].sim - 0.15)) {
       return scores[0].n;
     }
@@ -376,8 +376,8 @@
       // 带引号：「李梓骅」拍了拍 / "李梓骅" tickled
       m = line.match(/[“"「『]([^”"」『\s]{1,8})[”"」』]\s*(?:拍了拍|tickled)/i);
       if (m) { out.add(m[1]); continue; }
-      // 不带引号：李梓骅 tickled / 李梓骅 拍了拍
-      m = line.match(/([一-龥]{2,4})\s*(?:拍了拍|tickled)/i);
+      // 不带引号：李梓骅 tickled / 王 梓 丞 tickled（容忍名字中间的空格）
+      m = line.match(/([一-龥](?:\s*[一-龥]){1,3})\s*(?:拍了拍|tickled)/i);
       if (m) out.add(m[1]);
     }
     return [...out];
