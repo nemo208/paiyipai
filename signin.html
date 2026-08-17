@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>签到</title>
+<style>
+  :root {
+    --bg: #f4f6f5; --card: #fff; --ink: #1f2329; --muted: #6b7280; --line: #e5e7eb;
+    --green: #16a34a; --green-bg: #e6f7ec; --off: #f3f4f6; --off-line: #d9dce1;
+    --accent: #16a34a; --warn: #d97706; --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6;
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 14px 80px; }
+  header { text-align: center; margin-bottom: 16px; }
+  h1 { font-size: 24px; margin: 0 0 4px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  h1 .logo { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,#16a34a,#059669); color: #fff; font-size: 18px; }
+  .subtitle { color: var(--muted); margin: 0; font-size: 13px; }
+
+  .banner { background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; display: none; }
+  .banner.show { display: block; }
+
+  .summary { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); text-align: center; }
+  .stat .num { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat.done .num { color: var(--green); }
+  .stat.left .num { color: var(--warn); }
+
+  .status { text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 18px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  .cell {
+    position: relative; display: flex; align-items: center; gap: 8px;
+    padding: 14px 12px; border-radius: 12px; border: 1.5px solid var(--off-line);
+    background: var(--off); cursor: pointer; transition: .12s; text-align: left;
+    font-family: inherit; font-size: 15px; color: var(--ink);
+  }
+  .cell .idx { font-size: 11px; color: var(--muted); opacity: .6; }
+  .cell .nm { flex: 1; font-weight: 600; }
+  .cell .st { font-size: 12px; color: var(--muted); }
+  .cell.on { background: var(--green-bg); border-color: #9ad8b4; }
+  .cell.on .nm { color: #137a37; }
+  .cell.on .st { color: var(--green); font-weight: 700; }
+  .cell:active { transform: scale(.97); }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 18px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none;
+    border-radius: 9px; padding: 10px 16px; font-size: 14px; font-weight: 600;
+    background: var(--accent); color: #fff; transition: .12s; font-family: inherit;
+  }
+  .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn.rose { background: #dc2626; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .foot { color: #9aa1ab; font-size: 12px; margin-top: 24px; text-align: center; }
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); background: #1f2329; color: #fff; padding: 9px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 50; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="logo">✓</span>签到</h1>
+    <p class="subtitle">找到你的名字点一下即可签到 · 数据实时共享</p>
+  </header>
+
+  <div class="banner" id="banner">⚠️ 还没配置云端数据库，请联系管理员配置后再使用。</div>
+
+  <div class="summary">
+    <div class="stat done"><div class="num" id="n-done">0</div><div class="label">已签到</div></div>
+    <div class="stat left"><div class="num" id="n-left">28</div><div class="label">未签到</div></div>
+    <div class="stat"><div class="num" id="n-total">28</div><div class="label">总人数</div></div>
+  </div>
+
+  <div class="status" id="status">正在连接…</div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="actions">
+    <button class="btn ghost" id="btn-refresh">刷新</button>
+    <button class="btn" id="btn-copy-left">复制未签到名单</button>
+    <button class="btn rose" id="btn-reset">重置签到</button>
+  </div>
+
+  <div class="foot">点击名字签到 · 再点已签到的名字可撤销 · 数据自动同步</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===================== 云端配置（改成你的 Supabase 信息） =====================
+  const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';   // ← 项目 URL
+  const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';                  // ← anon public key
+  const TABLE = 'signin';
+  const configured = !SUPABASE_URL.includes('YOUR-PROJECT');
+
+  // ===================== 人名单（所有人看到同一份） =====================
+  const ROSTER = [
+    '李梓骅','王梓丞','刘子奥','陈奕霏','杨梓童','连芙华','简佳怡','黄烨晨','陈铭禹','夏千尧',
+    '宋佳宜','王溪恺','王子沫','王序','向淑颖','张善尹','张鑫阳','普好','舒本华','陶然',
+    '钱乐怡','孙翊妍','杜雨曦','庄臣逸','魏梦欣','乔熙童','金唯依','张语桐'
+  ];
+
+  const $ = id => document.getElementById(id);
+  let signed = new Set();     // 已签到的人名
+  let syncOk = false;
+
+  // ===================== Supabase REST 请求 =====================
+  function hdrs() {
+    return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
+  }
+  async function getSigned() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=name&order=name.asc`, { headers: hdrs() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    return rows.map(r => r.name);
+  }
+  async function signIn(name) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?on_conflict=name`, {
+      method: 'POST',
+      headers: { ...hdrs(), 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+  async function unSign(name) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?name=eq.${encodeURIComponent(name)}`, {
+      method: 'DELETE', headers: { ...hdrs(), 'Prefer': 'return=minimal' },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+  async function resetAll() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?name=like.*`, {
+      method: 'DELETE', headers: { ...hdrs(), 'Prefer': 'return=minimal' },
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+
+  // ===================== 渲染 =====================
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function render() {
+    const total = ROSTER.length;
+    const done = ROSTER.filter(n => signed.has(n)).length;
+    $('n-done').textContent = done;
+    $('n-left').textContent = total - done;
+    $('n-total').textContent = total;
+    $('grid').innerHTML = ROSTER.map(n => {
+      const on = signed.has(n);
+      return `<button class="cell ${on ? 'on' : ''}" data-name="${escapeHtml(n)}">
+        <span class="idx">${ROSTER.indexOf(n) + 1}</span>
+        <span class="nm">${escapeHtml(n)}</span>
+        <span class="st">${on ? '✓ 已签' : '签到'}</span>
+      </button>`;
+    }).join('');
+  }
+
+  // ===================== 同步 =====================
+  async function refresh(manual) {
+    if (!configured) { $('banner').classList.add('show'); $('status').textContent = '未配置数据库'; return; }
+    $('banner').classList.remove('show');
+    try {
+      signed = new Set(await getSigned());
+      syncOk = true;
+      $('status').textContent = '✓ 已同步 · ' + new Date().toLocaleTimeString('zh-CN');
+      render();
+    } catch (e) {
+      syncOk = false;
+      $('status').textContent = '同步失败，稍后自动重试（' + e.message + '）';
+    }
+    if (manual) toast('已刷新');
+  }
+
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+  function busy(b) { ['btn-refresh','btn-reset'].forEach(id => $(id).disabled = b); }
+
+  // ===================== 事件 =====================
+  $('grid').addEventListener('click', async e => {
+    const cell = e.target.closest('.cell');
+    if (!cell || !configured) { if (!configured) toast('数据库未配置'); return; }
+    const name = cell.getAttribute('data-name');
+    const on = signed.has(name);
+    if (!on) {
+      if (!confirm(`确定以「${name}」签到吗？`)) return;
+      busy(true);
+      try { await signIn(name); toast('签到成功'); await refresh(); } catch (err) { toast('签到失败：' + err.message); }
+      busy(false);
+    } else {
+      if (!confirm(`取消「${name}」的签到？`)) return;
+      busy(true);
+      try { await unSign(name); toast('已撤销'); await refresh(); } catch (err) { toast('撤销失败：' + err.message); }
+      busy(false);
+    }
+  });
+
+  $('btn-refresh').addEventListener('click', () => refresh(true));
+  $('btn-reset').addEventListener('click', async () => {
+    if (!configured) { toast('数据库未配置'); return; }
+    if (!confirm('确定清空所有签到记录吗？此操作不可恢复。')) return;
+    busy(true);
+    try { await resetAll(); toast('已清空'); await refresh(); } catch (err) { toast('清空失败：' + err.message); }
+    busy(false);
+  });
+  $('btn-copy-left').addEventListener('click', () => {
+    const list = ROSTER.filter(n => !signed.has(n));
+    const text = `未签到（${list.length} 人）：\n` + list.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    (navigator.clipboard?.writeText ? navigator.clipboard.writeText(text) : Promise.reject())
+      .then(() => toast('已复制未签到名单'))
+      .catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制'); });
+  });
+
+  // ===================== 启动 =====================
+  render();
+  refresh();
+  setInterval(() => refresh(), 3000);
+</script>
+</body>
+</html>
