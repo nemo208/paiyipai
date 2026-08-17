@@ -114,6 +114,7 @@
     '刘泱艺','吴迪','袁晨希','方睿涵','吴卓轩','潘懿凡','陈袁儒轼','何牧','孙亦嘉','刘柳可欣'
   ];
 
+  const START_NO = 312;   // 编号从 312 开始（对应学号）
   const $ = id => document.getElementById(id);
   let signed = [];            // 已签到名单（数组）
 
@@ -159,7 +160,7 @@
     $('grid').innerHTML = ROSTER.map(n => {
       const on = set.has(n);
       return `<button class="cell ${on ? 'on' : ''}" data-name="${escapeHtml(n)}">
-        <span class="idx">${ROSTER.indexOf(n) + 1}</span>
+        <span class="idx">${START_NO + ROSTER.indexOf(n)}</span>
         <span class="nm">${escapeHtml(n)}</span>
         <span class="st">${on ? '✓ 已签' : '签到'}</span>
       </button>`;
@@ -216,7 +217,7 @@
   $('btn-copy-left').addEventListener('click', () => {
     const set = new Set(signed);
     const list = ROSTER.filter(n => !set.has(n));
-    const text = `未签到（${list.length} 人）：\n` + list.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    const text = `未签到（${list.length} 人）：\n` + list.map(n => `${START_NO + ROSTER.indexOf(n)}. ${n}`).join('\n');
     (navigator.clipboard?.writeText ? navigator.clipboard.writeText(text) : Promise.reject())
       .then(() => toast('已复制未签到名单'))
       .catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制'); });
