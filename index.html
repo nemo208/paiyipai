@@ -275,15 +275,16 @@
 
   const $ = id => document.getElementById(id);
 
-  // ===================== 加载 OCR 引擎（带 CDN 回退） =====================
-  const SCRIPT_CDNS = [
-    'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
-    'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js',
-    'https://cdn.bootcdn.net/ajax/libs/tesseract.js/5.1.1/tesseract.min.js'
+  // ===================== 加载 OCR 引擎（多 CDN 自动回退，优先国内可达的镜像） =====================
+  const TESS_VER = '5.1.1';
+  const CHI_VER = '1.0.0';
+  const CDNS = [
+    'https://fastly.jsdelivr.net/npm',   // 国内速度快（实测 ~1.1MB/s）
+    'https://unpkg.com',
+    'https://gcore.jsdelivr.net/npm',
+    'https://cdn.jsdelivr.net/npm'       // 兜底（国内很慢，仅作最后手段）
   ];
-  const LANG_PATH_STD = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim@1.0.0/4.0.0/';
-  const LANG_PATH_FAST = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim@1.0.0/4.0.0_best_int/';
-  const LANG_PATH_FALLBACK = 'https://tessdata.projectnaptha.com/4.0.0';
+  const SCRIPT_URLS = CDNS.map(c => `${c}/tesseract.js@${TESS_VER}/dist/tesseract.min.js`);
 
   function loadScript(src) {
     return new Promise((res, rej) => {
@@ -296,10 +297,35 @@
   }
   async function ensureTesseract() {
     if (window.Tesseract) return;
-    for (const src of SCRIPT_CDNS) {
+    for (const src of SCRIPT_URLS) {
       try { await loadScript(src); if (window.Tesseract) return; } catch (e) {}
     }
     throw new Error('无法加载 OCR 引擎，请检查网络后刷新重试');
+  }
+
+  // 创建 worker，自动在多个 CDN 之间回退（模型/内核下载失败就换下一个镜像）
+  async function createWorker(mode) {
+    const dataDir = mode === 'fast' ? '4.0.0_best_int' : '4.0.0';
+    let lastErr = null;
+    for (const cdn of CDNS) {
+      try {
+        return await Tesseract.createWorker('chi_sim', 1, {
+          workerPath: `${cdn}/tesseract.js@${TESS_VER}/dist/worker.min.js`,
+          corePath: `${cdn}/tesseract.js-core@${TESS_VER}`,
+          langPath: `${cdn}/@tesseract.js-data/chi_sim@${CHI_VER}/${dataDir}/`,
+          logger: m => {
+            if (!m.status) return;
+            if (m.status === 'recognizing text') {
+              setStatus(`正在识别文字… ${Math.round((m.progress || 0) * 100)}%`);
+              setBar(m.progress || 0);
+            } else {
+              setStatus(STATUS_ZH[m.status] || m.status);
+            }
+          }
+        });
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('OCR 引擎启动失败');
   }
 
   // ===================== 字符串工具 =====================
@@ -400,22 +426,10 @@
     try {
       await ensureTesseract();
       const mode = $('mode').value;
-      const langPath = mode === 'fast' ? LANG_PATH_FAST : LANG_PATH_STD;
 
       if (!worker) {
-        setStatus('正在启动识别引擎…');
-        worker = await Tesseract.createWorker('chi_sim', 1, {
-          langPath,
-          logger: m => {
-            if (!m.status) return;
-            if (m.status === 'recognizing text') {
-              setStatus(`正在识别文字… ${Math.round((m.progress || 0) * 100)}%`);
-              setBar(m.progress || 0);
-            } else {
-              setStatus(STATUS_ZH[m.status] || m.status);
-            }
-          }
-        });
+        setStatus('正在启动识别引擎（首次需下载模型，请稍候）…');
+        worker = await createWorker(mode);
       }
 
       const newlyPat = new Set();
