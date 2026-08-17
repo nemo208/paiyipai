@@ -75,7 +75,7 @@
     <p class="subtitle">找到你的名字点一下即可签到 · 数据实时共享</p>
   </header>
 
-  <div class="banner" id="banner">⚠️ 还没配置云端数据库，请联系管理员配置后再使用。</div>
+  <div class="banner" id="banner">⚠️ 还没配置共享存储，请联系管理员配置后再使用。</div>
 
   <div class="summary">
     <div class="stat done"><div class="num" id="n-done">0</div><div class="label">已签到</div></div>
@@ -98,11 +98,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  // ===================== 云端配置（改成你的 Supabase 信息） =====================
-  const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';   // ← 项目 URL
-  const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';                  // ← anon public key
+  // ===================== 云端数据库配置（Supabase） =====================
+  const SUPABASE_URL = 'https://xhxfczzkvcsvujkmmrsf.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoeGZjenprdmNzdnVqa21tcnNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5MzY2NjksImV4cCI6MjEwMjUxMjY2OX0.FVYCFYV7_vQiNd_3Pp0VVYJ9dPXcsuMscR4m9zuCoXM';
   const TABLE = 'signin';
-  const configured = !SUPABASE_URL.includes('YOUR-PROJECT');
+  const configured = true;
 
   // ===================== 人名单（所有人看到同一份） =====================
   const ROSTER = [
@@ -112,10 +112,9 @@
   ];
 
   const $ = id => document.getElementById(id);
-  let signed = new Set();     // 已签到的人名
-  let syncOk = false;
+  let signed = [];            // 已签到名单（数组）
 
-  // ===================== Supabase REST 请求 =====================
+  // ===================== Supabase REST 读写 =====================
   function hdrs() {
     return { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
   }
@@ -127,8 +126,7 @@
   }
   async function signIn(name) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?on_conflict=name`, {
-      method: 'POST',
-      headers: { ...hdrs(), 'Prefer': 'resolution=merge-duplicates' },
+      method: 'POST', headers: { ...hdrs(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ name }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -149,13 +147,14 @@
   // ===================== 渲染 =====================
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
   function render() {
+    const set = new Set(signed);
     const total = ROSTER.length;
-    const done = ROSTER.filter(n => signed.has(n)).length;
+    const done = ROSTER.filter(n => set.has(n)).length;
     $('n-done').textContent = done;
     $('n-left').textContent = total - done;
     $('n-total').textContent = total;
     $('grid').innerHTML = ROSTER.map(n => {
-      const on = signed.has(n);
+      const on = set.has(n);
       return `<button class="cell ${on ? 'on' : ''}" data-name="${escapeHtml(n)}">
         <span class="idx">${ROSTER.indexOf(n) + 1}</span>
         <span class="nm">${escapeHtml(n)}</span>
@@ -166,15 +165,13 @@
 
   // ===================== 同步 =====================
   async function refresh(manual) {
-    if (!configured) { $('banner').classList.add('show'); $('status').textContent = '未配置数据库'; return; }
+    if (!configured) { $('banner').classList.add('show'); $('status').textContent = '未配置存储'; return; }
     $('banner').classList.remove('show');
     try {
-      signed = new Set(await getSigned());
-      syncOk = true;
+      signed = await getSigned();
       $('status').textContent = '✓ 已同步 · ' + new Date().toLocaleTimeString('zh-CN');
       render();
     } catch (e) {
-      syncOk = false;
       $('status').textContent = '同步失败，稍后自动重试（' + e.message + '）';
     }
     if (manual) toast('已刷新');
@@ -189,9 +186,9 @@
   // ===================== 事件 =====================
   $('grid').addEventListener('click', async e => {
     const cell = e.target.closest('.cell');
-    if (!cell || !configured) { if (!configured) toast('数据库未配置'); return; }
+    if (!cell || !configured) { if (!configured) toast('存储未配置'); return; }
     const name = cell.getAttribute('data-name');
-    const on = signed.has(name);
+    const on = signed.includes(name);
     if (!on) {
       if (!confirm(`确定以「${name}」签到吗？`)) return;
       busy(true);
@@ -207,14 +204,15 @@
 
   $('btn-refresh').addEventListener('click', () => refresh(true));
   $('btn-reset').addEventListener('click', async () => {
-    if (!configured) { toast('数据库未配置'); return; }
+    if (!configured) { toast('存储未配置'); return; }
     if (!confirm('确定清空所有签到记录吗？此操作不可恢复。')) return;
     busy(true);
     try { await resetAll(); toast('已清空'); await refresh(); } catch (err) { toast('清空失败：' + err.message); }
     busy(false);
   });
   $('btn-copy-left').addEventListener('click', () => {
-    const list = ROSTER.filter(n => !signed.has(n));
+    const set = new Set(signed);
+    const list = ROSTER.filter(n => !set.has(n));
     const text = `未签到（${list.length} 人）：\n` + list.map((n, i) => `${i + 1}. ${n}`).join('\n');
     (navigator.clipboard?.writeText ? navigator.clipboard.writeText(text) : Promise.reject())
       .then(() => toast('已复制未签到名单'))
