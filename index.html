@@ -373,10 +373,10 @@
       if (!/拍了拍|tickled/i.test(line)) continue;
       line = line.trim();
       let m;
-      // 带引号：「李梓骅」拍了拍 / "李梓骅" tickled
+      // 带引号：「李梓晔」拍了拍 / "李梓晔" tickled
       m = line.match(/[“"「『]([^”"」『\s]{1,8})[”"」』]\s*(?:拍了拍|tickled)/i);
       if (m) { out.add(m[1]); continue; }
-      // 不带引号：李梓骅 tickled / 王 梓 丞 tickled（容忍名字中间的空格）
+      // 不带引号：李梓晔 tickled / 王 梓 丞 tickled（容忍名字中间的空格）
       m = line.match(/([一-龥](?:\s*[一-龥]){1,3})\s*(?:拍了拍|tickled)/i);
       if (m) out.add(m[1]);
     }
