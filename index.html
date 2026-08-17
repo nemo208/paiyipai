@@ -163,12 +163,12 @@
 <div class="wrap">
   <header>
     <h1><span class="logo">拍</span>拍一拍点名助手</h1>
-    <p class="subtitle">上传微信截图，自动识别谁「拍了拍我」，并记录还没拍的人</p>
+    <p class="subtitle">上传微信截图，自动识别谁「拍过了」，并记录还没拍的人</p>
   </header>
 
   <div class="summary">
     <div class="stat total"><div class="num" id="count-total">28</div><div class="label">总人数</div></div>
-    <div class="stat pat"><div class="num" id="count-pat">0</div><div class="label">已拍（拍了拍我）</div></div>
+    <div class="stat pat"><div class="num" id="count-pat">0</div><div class="label">已拍（拍过了）</div></div>
     <div class="stat not"><div class="num" id="count-not">28</div><div class="label">未拍（还没拍）</div></div>
   </div>
 
@@ -442,7 +442,7 @@
       }
 
       newlyPat.forEach(n => state[n] = true);
-      setStatus(`识别完成：共 ${images.length} 张图，新识别到 ${newlyPat.size} 人拍了拍我`);
+      setStatus(`识别完成：共 ${images.length} 张图，新识别到 ${newlyPat.size} 人拍过了`);
       $('bar').classList.remove('show');
       render();
     } catch (e) {
