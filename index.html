@@ -364,19 +364,20 @@
     return null;
   }
 
-  // 从 OCR 文本中提取「XX 拍了拍我」里的名字
+  // 从 OCR 文本中提取「谁拍了」的名字：支持中文「拍了拍」和英文「tickled」，
+  // 只抓动作词【前面】的名字（= 谁拍的），动作词后面的目标（如 王欣悦）不抓。
   function extractPatted(text) {
     const out = new Set();
     const lines = text.split(/\r?\n/);
     for (let line of lines) {
-      if (!line.includes('拍了拍')) continue;
+      if (!/拍了拍|tickled/i.test(line)) continue;
       line = line.trim();
       let m;
-      // 带引号：「李梓骅」拍了拍我
-      m = line.match(/[“"「『]([^”"」『\s]{1,6})[”"」』]\s*拍了拍/);
+      // 带引号：「李梓骅」拍了拍 / "李梓骅" tickled
+      m = line.match(/[“"「『]([^”"」『\s]{1,8})[”"」』]\s*(?:拍了拍|tickled)/i);
       if (m) { out.add(m[1]); continue; }
-      // 不带引号：李梓骅 拍了拍我
-      m = line.match(/([一-龥]{2,4})\s*拍了拍/);
+      // 不带引号：李梓骅 tickled / 李梓骅 拍了拍
+      m = line.match(/([一-龥]{2,4})\s*(?:拍了拍|tickled)/i);
       if (m) out.add(m[1]);
     }
     return [...out];
