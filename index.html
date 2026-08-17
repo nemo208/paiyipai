@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拍一拍点名助手</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --ink: #1f2329;
+    --muted: #6b7280;
+    --line: #e6e8eb;
+    --accent: #3b82f6;
+    --accent-weak: #eaf1fe;
+    --pat: #16a34a;
+    --pat-bg: #e8f7ee;
+    --not: #dc2626;
+    --not-bg: #fdeaea;
+    --warn: #d97706;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 28px 18px 80px; }
+
+  header { margin-bottom: 20px; }
+  h1 {
+    font-size: 26px; margin: 0 0 6px; letter-spacing: .5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h1 .logo {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: #fff; font-size: 20px;
+  }
+  .subtitle { color: var(--muted); margin: 0; font-size: 14px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 20px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 12px; }
+
+  /* 汇总 */
+  .summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat {
+    flex: 1 1 140px; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .stat .num { font-size: 30px; font-weight: 700; line-height: 1.1; }
+  .stat .label { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .stat.total .num { color: var(--ink); }
+  .stat.pat .num { color: var(--pat); }
+  .stat.not .num { color: var(--not); }
+
+  /* 上传区 */
+  #drop {
+    border: 2px dashed #cbd2dc; border-radius: 12px; padding: 30px 20px;
+    text-align: center; cursor: pointer; transition: .15s; background: #fafbfc;
+  }
+  #drop.dragover { border-color: var(--accent); background: var(--accent-weak); }
+  #drop .big { font-size: 34px; }
+  #drop p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+  #drop .hint { font-size: 12px; color: #9aa1ab; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: none; border-radius: 9px; padding: 10px 16px; font-size: 14px;
+    font-weight: 600; background: var(--accent); color: #fff; transition: .12s;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover { background: #f5f6f8; }
+  .btn.green { background: var(--pat); }
+  .btn.rose { background: var(--not); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+  /* 缩略图 */
+  .thumbs { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+  .thumb {
+    position: relative; width: 88px; height: 88px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--line); background: #000;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb .del {
+    position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+    border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; border: none;
+    cursor: pointer; font-size: 12px; line-height: 20px; text-align: center; padding: 0;
+  }
+  .thumb .del:hover { background: var(--not); }
+
+  /* 进度 */
+  #status-line { font-size: 13px; color: var(--muted); min-height: 20px; margin-top: 12px; }
+  .bar { height: 8px; border-radius: 6px; background: #eef0f3; overflow: hidden; margin-top: 8px; display: none; }
+  .bar.show { display: block; }
+  .bar .fill { height: 100%; width: 0; background: linear-gradient(90deg, #3b82f6, #6366f1); transition: width .2s; }
+
+  /* 结果 */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 640px) {
+    .cols { grid-template-columns: 1fr; }
+    .wrap { padding: 16px 12px 64px; }
+    h1 { font-size: 22px; }
+    .card { padding: 16px; }
+    .chip { padding: 10px 14px; font-size: 15px; }
+    .btn { padding: 12px 16px; }
+    #drop { padding: 26px 14px; }
+    .thumb { width: 76px; height: 76px; }
+  }
+  .col-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .col-head .tag { font-size: 13px; padding: 2px 10px; border-radius: 20px; font-weight: 600; }
+  .tag.pat { background: var(--pat-bg); color: var(--pat); }
+  .tag.not { background: var(--not-bg); color: var(--not); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    padding: 7px 12px; border-radius: 20px; font-size: 14px; user-select: none;
+    border: 1px solid var(--line); transition: .1s;
+  }
+  .chip.pat { background: var(--pat-bg); border-color: #bfe6cd; color: #137a37; }
+  .chip.not { background: var(--not-bg); border-color: #f3c4c4; color: #b91c1c; }
+  .chip:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .chip .idx { font-size: 11px; opacity: .55; }
+  .chip .warn {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--warn); color: #fff;
+    font-size: 11px; line-height: 16px; text-align: center; font-weight: 700;
+  }
+  .empty { color: #9aa1ab; font-size: 13px; }
+
+  /* OCR 原文 */
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .ocr-box {
+    margin-top: 8px; background: #f8f9fa; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-all;
+    max-height: 240px; overflow: auto; color: #555; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  .foot { color: #9aa1ab; font-size: 12px; margin-top: 24px; text-align: center; }
+  .toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    background: #1f2329; color: #fff; padding: 9px 18px; border-radius: 10px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="logo">拍</span>拍一拍点名助手</h1>
+    <p class="subtitle">上传微信截图，自动识别谁「拍了拍我」，并记录还没拍的人</p>
+  </header>
+
+  <div class="summary">
+    <div class="stat total"><div class="num" id="count-total">28</div><div class="label">总人数</div></div>
+    <div class="stat pat"><div class="num" id="count-pat">0</div><div class="label">已拍（拍了拍我）</div></div>
+    <div class="stat not"><div class="num" id="count-not">28</div><div class="label">未拍（还没拍）</div></div>
+  </div>
+
+  <div class="card" style="padding:14px 20px">
+    <details id="roster-details">
+      <summary style="cursor:pointer;font-size:15px;font-weight:600">名单设置 <span style="font-weight:400;color:var(--muted);font-size:13px">—— 别人使用时在这里改成自己的名单</span></summary>
+      <div style="margin-top:12px">
+        <textarea id="roster-input" rows="9" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn" id="btn-apply-roster">保存名单</button>
+          <button class="btn ghost" id="btn-reset-roster">恢复默认 28 人</button>
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">每行一个名字。保存后自动生效，并记住在本浏览器里；换名单后识别结果会清零重算。</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>1. 上传截图</h2>
+    <div id="drop">
+      <div class="big">🖼️</div>
+      <p>点击或拖拽图片到这里</p>
+      <p class="hint">支持多张、可反复添加。图片仅在本地浏览器中识别，不会上传到任何服务器</p>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple hidden>
+    <div class="thumbs" id="thumbs"></div>
+
+    <div class="actions">
+      <button class="btn" id="btn-start">开始识别</button>
+      <button class="btn ghost" id="btn-clear">清空重来</button>
+      <label class="btn ghost" style="cursor:pointer">
+        精度：<select id="mode" style="font:inherit;border:none;background:transparent;cursor:pointer;color:inherit">
+          <option value="std">标准（更准，首次下载约 20MB）</option>
+          <option value="fast">快速（更快，约 1.7MB）</option>
+        </select>
+      </label>
+    </div>
+    <div id="status-line">尚未开始识别</div>
+    <div class="bar" id="bar"><div class="fill" id="bar-fill"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>2. 识别结果 <span style="font-weight:400;color:var(--muted);font-size:13px">（点击名字可手动修正）</span></h2>
+    <div class="cols">
+      <div>
+        <div class="col-head"><span class="tag pat">已拍</span><button class="btn green" id="btn-copy-pat" style="padding:5px 12px;font-size:13px">复制名单</button></div>
+        <div class="chips" id="list-pat"></div>
+      </div>
+      <div>
+        <div class="col-head"><span class="tag not">未拍</span><button class="btn rose" id="btn-copy-not" style="padding:5px 12px;font-size:13px">复制名单</button></div>
+        <div class="chips" id="list-not"></div>
+      </div>
+    </div>
+    <details>
+      <summary>查看 OCR 识别原文（调试用）</summary>
+      <div class="ocr-box" id="ocr-text">（暂无）</div>
+    </details>
+  </div>
+
+  <div class="foot">数据只保存在当前页面的内存里，刷新即清空 · 识别引擎 Tesseract.js</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  // ===================== 人名单 =====================
+  const DEFAULT_ROSTER = [
+    '李梓骅','王梓丞','刘子奥','陈奕霏','杨梓童','连芙华','简佳怡','黄烨晨','陈铭禹','夏千尧',
+    '宋佳宜','王溪恺','王子沫','王序','向淑颖','张善尹','张鑫阳','普好','舒本华','陶然',
+    '钱乐怡','孙翊妍','杜雨曦','庄臣逸','魏梦欣','乔熙童','金唯依','张语桐'
+  ];
+  const STORAGE_KEY = 'paiyipai_roster';
+
+  function loadRoster() {
+    try {
+      const s = localStorage.getItem(STORAGE_KEY);
+      if (s) {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) {
+          const names = arr.map(n => String(n).trim()).filter(Boolean);
+          if (names.length) return [...new Set(names)];
+        }
+      }
+    } catch (e) {}
+    return [...DEFAULT_ROSTER];
+  }
+
+  function applyRoster(names) {
+    ROSTER = [...new Set(names.map(n => String(n).trim()).filter(Boolean))];
+    if (!ROSTER.length) ROSTER = [...DEFAULT_ROSTER];
+    state = {};
+    ROSTER.forEach(n => state[n] = false);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ROSTER)); } catch (e) {}
+    render();
+  }
+
+  let ROSTER = loadRoster();
+
+  // ===================== 状态 =====================
+  let state = {};            // 姓名 -> true(已拍) / false(未拍)
+  ROSTER.forEach(n => state[n] = false);
+  let ocrText = '';          // 累积的 OCR 原文
+  let images = [];           // {id, file, url}
+  let worker = null;
+
+  const $ = id => document.getElementById(id);
+
+  // ===================== 加载 OCR 引擎（带 CDN 回退） =====================
+  const SCRIPT_CDNS = [
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+    'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js',
+    'https://cdn.bootcdn.net/ajax/libs/tesseract.js/5.1.1/tesseract.min.js'
+  ];
+  const LANG_PATH_STD = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim@1.0.0/4.0.0/';
+  const LANG_PATH_FAST = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim@1.0.0/4.0.0_best_int/';
+  const LANG_PATH_FALLBACK = 'https://tessdata.projectnaptha.com/4.0.0';
+
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = res;
+      s.onerror = () => { s.remove(); rej(new Error('load fail: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  async function ensureTesseract() {
+    if (window.Tesseract) return;
+    for (const src of SCRIPT_CDNS) {
+      try { await loadScript(src); if (window.Tesseract) return; } catch (e) {}
+    }
+    throw new Error('无法加载 OCR 引擎，请检查网络后刷新重试');
+  }
+
+  // ===================== 字符串工具 =====================
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return dp[m][n];
+  }
+
+  // 把候选文本匹配到人名单（精确 -> 包含 -> 模糊）
+  function matchName(cand) {
+    const c = cand.replace(/[^一-龥]/g, '');
+    if (!c) return null;
+    if (ROSTER.includes(c)) return c;
+
+    // 包含关系（长度 >= 2 才安全）
+    if (c.length >= 2) {
+      for (const n of ROSTER) {
+        if (n.length >= 2 && (n.includes(c) || c.includes(n))) return n;
+      }
+    }
+
+    // 模糊匹配：取相似度最高者，且要求明显高于第二名
+    const scores = ROSTER.map(n => ({ n, sim: 1 - levenshtein(c, n) / Math.max(c.length, n.length) }));
+    scores.sort((a, b) => b.sim - a.sim);
+    const minLen = Math.min(c.length, scores[0].n.length);
+    const threshold = minLen >= 3 ? 0.62 : 0.999;   // 2 字名要求几乎精确
+    if (scores[0].sim >= threshold && (scores.length < 2 || scores[1].sim < scores[0].sim - 0.15)) {
+      return scores[0].n;
+    }
+    return null;
+  }
+
+  // 从 OCR 文本中提取「XX 拍了拍我」里的名字
+  function extractPatted(text) {
+    const out = new Set();
+    const lines = text.split(/\r?\n/);
+    for (let line of lines) {
+      if (!line.includes('拍了拍')) continue;
+      line = line.trim();
+      let m;
+      // 带引号：「李梓骅」拍了拍我
+      m = line.match(/[“"「『]([^”"」『\s]{1,6})[”"」』]\s*拍了拍/);
+      if (m) { out.add(m[1]); continue; }
+      // 不带引号：李梓骅 拍了拍我
+      m = line.match(/([一-龥]{2,4})\s*拍了拍/);
+      if (m) out.add(m[1]);
+    }
+    return [...out];
+  }
+
+  // ===================== UI 渲染 =====================
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  function chip(name, isPat) {
+    const suspicious = !isPat && ocrText.includes(name);
+    const idx = ROSTER.indexOf(name) + 1;
+    return `<div class="chip ${isPat ? 'pat' : 'not'}" data-name="${escapeHtml(name)}" title="点击切换状态">
+      <span class="idx">${idx}</span>${escapeHtml(name)}
+      ${suspicious ? '<span class="warn" title="截图里出现了这个名字，但没识别到「拍了拍」，请核对">!</span>' : ''}
+    </div>`;
+  }
+
+  function render() {
+    const pat = ROSTER.filter(n => state[n]);
+    const not = ROSTER.filter(n => !state[n]);
+    $('count-total').textContent = ROSTER.length;
+    $('count-pat').textContent = pat.length;
+    $('count-not').textContent = not.length;
+    $('list-pat').innerHTML = pat.length ? pat.map(n => chip(n, true)).join('') : '<div class="empty">还没有识别到</div>';
+    $('list-not').innerHTML = not.length ? not.map(n => chip(n, false)).join('') : '<div class="empty">🎉 全部人都拍过了</div>';
+    $('ocr-text').textContent = ocrText || '（暂无）';
+  }
+
+  // ===================== 进度 =====================
+  const STATUS_ZH = {
+    'loading tesseract core': '加载 OCR 引擎内核…',
+    'initializing tesseract': '初始化 OCR…',
+    'loading language traineddata': '下载中文识别模型（首次较慢）…',
+    'initializing api': '初始化识别接口…',
+    'recognizing text': '正在识别文字…'
+  };
+  function setStatus(txt) { $('status-line').textContent = txt; }
+  function setBar(p) {
+    $('bar').classList.add('show');
+    $('bar-fill').style.width = Math.round(p * 100) + '%';
+  }
+
+  // ===================== OCR 主流程 =====================
+  async function startRecognition() {
+    if (!images.length) { toast('请先上传图片'); return; }
+    $('btn-start').disabled = true;
+    try {
+      await ensureTesseract();
+      const mode = $('mode').value;
+      const langPath = mode === 'fast' ? LANG_PATH_FAST : LANG_PATH_STD;
+
+      if (!worker) {
+        setStatus('正在启动识别引擎…');
+        worker = await Tesseract.createWorker('chi_sim', 1, {
+          langPath,
+          logger: m => {
+            if (!m.status) return;
+            if (m.status === 'recognizing text') {
+              setStatus(`正在识别文字… ${Math.round((m.progress || 0) * 100)}%`);
+              setBar(m.progress || 0);
+            } else {
+              setStatus(STATUS_ZH[m.status] || m.status);
+            }
+          }
+        });
+      }
+
+      const newlyPat = new Set();
+      for (let i = 0; i < images.length; i++) {
+        setStatus(`正在识别第 ${i + 1} / ${images.length} 张图片…`);
+        setBar(0);
+        const { data } = await worker.recognize(images[i].file);
+        ocrText += '\n' + data.text;
+        extractPatted(data.text).forEach(c => { const n = matchName(c); if (n) newlyPat.add(n); });
+      }
+
+      newlyPat.forEach(n => state[n] = true);
+      setStatus(`识别完成：共 ${images.length} 张图，新识别到 ${newlyPat.size} 人拍了拍我`);
+      $('bar').classList.remove('show');
+      render();
+    } catch (e) {
+      setStatus('识别出错：' + e.message);
+      toast('识别出错，请查看下方提示');
+      console.error(e);
+    } finally {
+      $('btn-start').disabled = false;
+    }
+  }
+
+  // ===================== 图片上传 =====================
+  function addFiles(fileList) {
+    for (const f of fileList) {
+      if (!f.type.startsWith('image/')) continue;
+      images.push({ id: Date.now() + Math.random(), file: f, url: URL.createObjectURL(f) });
+    }
+    renderThumbs();
+  }
+  function renderThumbs() {
+    $('thumbs').innerHTML = images.map(im =>
+      `<div class="thumb" data-id="${im.id}">
+        <img src="${im.url}" alt="">
+        <button class="del" data-del="${im.id}">×</button>
+      </div>`).join('');
+  }
+
+  // ===================== 复制 =====================
+  function copyText(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    return new Promise((res, rej) => {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); res(); } catch (e) { rej(e); }
+      ta.remove();
+    });
+  }
+  function copyList(isPat) {
+    const list = ROSTER.filter(n => state[n] === isPat);
+    const label = isPat ? '已拍名单' : '未拍名单';
+    const text = `${label}（${list.length} 人）：\n` + list.map((n, i) => `${i + 1}. ${n}`).join('\n');
+    copyText(text).then(() => toast('已复制到剪贴板')).catch(() => toast('复制失败，请手动复制'));
+  }
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ===================== 事件绑定 =====================
+  const drop = $('drop');
+  const fileInput = $('file-input');
+  drop.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { addFiles(e.target.files); fileInput.value = ''; });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+
+  $('thumbs').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]');
+    if (!del) return;
+    const id = del.getAttribute('data-del');
+    const im = images.find(x => x.id == id);
+    if (im) URL.revokeObjectURL(im.url);
+    images = images.filter(x => x.id != id);
+    renderThumbs();
+  });
+
+  $('btn-start').addEventListener('click', startRecognition);
+  $('btn-clear').addEventListener('click', () => {
+    images.forEach(im => URL.revokeObjectURL(im.url));
+    images = [];
+    ocrText = '';
+    ROSTER.forEach(n => state[n] = false);
+    if (worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+    setStatus('已清空');
+    $('bar').classList.remove('show');
+    renderThumbs();
+    render();
+  });
+  $('btn-copy-pat').addEventListener('click', () => copyList(true));
+  $('btn-copy-not').addEventListener('click', () => copyList(false));
+
+  // 点击名字切换状态
+  document.querySelector('.cols').addEventListener('click', e => {
+    const c = e.target.closest('.chip');
+    if (!c) return;
+    const name = c.getAttribute('data-name');
+    if (name in state) { state[name] = !state[name]; render(); }
+  });
+
+  // 名单编辑
+  function refreshRosterInput() { $('roster-input').value = ROSTER.join('\n'); }
+  $('btn-apply-roster').addEventListener('click', () => {
+    applyRoster($('roster-input').value.split(/\r?\n/));
+    refreshRosterInput();
+    toast('名单已保存（' + ROSTER.length + ' 人）');
+  });
+  $('btn-reset-roster').addEventListener('click', () => {
+    applyRoster(DEFAULT_ROSTER);
+    refreshRosterInput();
+    toast('已恢复默认 28 人');
+  });
+
+  render();
+  refreshRosterInput();
+</script>
+</body>
+</html>
